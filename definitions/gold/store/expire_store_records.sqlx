@@ -1,0 +1,34 @@
+config {
+  type: "operations",
+  schema: "retail_gold",
+  tags:["practice", "preparation", "2xday"],
+  dependencies: ["silver_pos_transactions"]
+}
+
+UPDATE retail_gold.dim_store t
+
+SET
+    effective_to = CURRENT_TIMESTAMP(),
+    is_current = FALSE
+
+WHERE is_current = TRUE
+
+AND EXISTS (
+
+    SELECT 1
+
+    FROM retail_silver.silver_pos_transactions s
+
+    WHERE t.store_id = s.store_id
+
+    AND (
+
+           COALESCE(t.store_name,'') != COALESCE(s.store_name,'')
+        OR COALESCE(t.store_city,'') != COALESCE(s.store_city,'')
+        OR COALESCE(t.store_state,'') != COALESCE(s.store_state,'')
+        OR COALESCE(t.region,'') != COALESCE(s.region,'')
+        OR COALESCE(t.store_type,'') != COALESCE(s.store_type,'')
+
+    )
+
+);

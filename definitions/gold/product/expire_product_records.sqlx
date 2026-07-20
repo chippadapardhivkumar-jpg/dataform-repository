@@ -1,0 +1,34 @@
+config {
+  type: "operations",
+  schema: "retail_gold",
+  dependencies: ["silver_pos_transactions"]
+}
+
+UPDATE retail_gold.dim_product t
+
+SET
+    effective_to = CURRENT_TIMESTAMP(),
+    is_current = FALSE
+
+WHERE is_current = TRUE
+
+AND EXISTS (
+
+    SELECT 1
+
+    FROM retail_silver.silver_pos_transactions s
+
+    WHERE t.product_id = s.product_id
+
+    AND (
+
+           COALESCE(t.product_name,'') != COALESCE(s.product_name,'')
+        OR COALESCE(t.category,'') != COALESCE(s.category,'')
+        OR COALESCE(t.sub_category,'') != COALESCE(s.sub_category,'')
+        OR COALESCE(t.brand,'') != COALESCE(s.brand,'')
+        OR COALESCE(t.unit_price,0) != COALESCE(s.unit_price,0)
+        OR COALESCE(t.cost_price,0) != COALESCE(s.cost_price,0)
+
+    )
+
+);

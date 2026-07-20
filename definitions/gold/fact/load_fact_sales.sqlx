@@ -1,0 +1,54 @@
+config {
+  type: "operations",
+  schema: "retail_gold",
+  dependencies: [
+    "insert_customer_records",
+    "insert_product_records",
+    "insert_store_records"
+  ]
+}
+
+INSERT INTO retail_gold.fact_sales
+
+SELECT
+
+    s.transaction_id,
+    s.product_id,
+    s.transaction_date,
+
+    dc.customer_sk,
+    dp.product_sk,
+    ds.store_sk,
+
+    s.quantity_sold,
+    s.unit_price,
+    s.cost_price,
+    s.discount_applied,
+    s.final_amount,
+
+    CURRENT_TIMESTAMP()
+
+FROM retail_silver.silver_pos_transactions s
+
+INNER JOIN retail_gold.dim_customer dc
+ON s.customer_id = dc.customer_id
+AND dc.is_current = TRUE
+
+INNER JOIN retail_gold.dim_product dp
+ON s.product_id = dp.product_id
+AND dp.is_current = TRUE
+
+INNER JOIN retail_gold.dim_store ds
+ON s.store_id = ds.store_id
+AND ds.is_current = TRUE
+
+WHERE NOT EXISTS (
+
+    SELECT 1
+
+    FROM retail_gold.fact_sales f
+
+    WHERE f.transaction_id = s.transaction_id
+    AND f.product_id = s.product_id
+
+);

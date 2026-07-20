@@ -1,0 +1,67 @@
+config {
+  type: "operations",
+  schema: "retail_gold",
+  dependencies: ["expire_product_records"]
+}
+
+INSERT INTO retail_gold.dim_product
+
+SELECT
+
+    ROW_NUMBER() OVER(
+        ORDER BY s.product_id
+    )
+    +
+    COALESCE(
+        (
+            SELECT MAX(product_sk)
+            FROM retail_gold.dim_product
+        ),
+        0
+    ),
+
+    s.product_id,
+    s.product_name,
+    s.category,
+    s.sub_category,
+    s.brand,
+    s.unit_price,
+    s.cost_price,
+
+    CURRENT_TIMESTAMP(),
+    TIMESTAMP('9999-12-31'),
+    TRUE,
+    CURRENT_TIMESTAMP()
+
+FROM (
+
+    SELECT DISTINCT
+        product_id,
+        product_name,
+        category,
+        sub_category,
+        brand,
+        unit_price,
+        cost_price
+
+    FROM retail_silver.silver_pos_transactions
+
+) s
+
+LEFT JOIN retail_gold.dim_product d
+
+ON s.product_id = d.product_id
+AND d.is_current = TRUE
+
+WHERE d.product_id IS NULL
+
+OR (
+
+       COALESCE(d.product_name,'') != COALESCE(s.product_name,'')
+    OR COALESCE(d.category,'') != COALESCE(s.category,'')
+    OR COALESCE(d.sub_category,'') != COALESCE(s.sub_category,'')
+    OR COALESCE(d.brand,'') != COALESCE(s.brand,'')
+    OR COALESCE(d.unit_price,0) != COALESCE(s.unit_price,0)
+    OR COALESCE(d.cost_price,0) != COALESCE(s.cost_price,0)
+
+);

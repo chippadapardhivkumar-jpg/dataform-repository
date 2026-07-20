@@ -1,0 +1,33 @@
+config {
+  type: "operations",
+  schema: "retail_gold",
+  dependencies: ["silver_pos_transactions"]
+}
+
+UPDATE retail_gold.dim_customer t
+
+SET
+    effective_to = CURRENT_TIMESTAMP(),
+    is_current = FALSE
+
+WHERE is_current = TRUE
+
+AND EXISTS (
+
+    SELECT 1
+
+    FROM retail_silver.silver_pos_transactions s
+
+    WHERE t.customer_id = s.customer_id
+
+    AND (
+
+           COALESCE(t.customer_name,'') != COALESCE(s.customer_name,'')
+        OR COALESCE(t.customer_email,'') != COALESCE(s.customer_email,'')
+        OR COALESCE(t.customer_city,'') != COALESCE(s.customer_city,'')
+        OR COALESCE(t.customer_state,'') != COALESCE(s.customer_state,'')
+        OR COALESCE(t.membership_tier,'') != COALESCE(s.membership_tier,'')
+
+    )
+
+);
