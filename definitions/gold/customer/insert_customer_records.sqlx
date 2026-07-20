@@ -1,0 +1,66 @@
+config {
+  type: "operations",
+  schema: "retail_gold",
+  dependencies: ["expire_customer_records"]
+}
+
+INSERT INTO retail_gold.dim_customer
+
+SELECT
+
+    ROW_NUMBER() OVER(
+    ORDER BY s.customer_id
+)
+    +
+    COALESCE(
+        (
+            SELECT MAX(customer_sk)
+            FROM retail_gold.dim_customer
+        ),
+        0
+    ) AS customer_sk,
+
+    s.customer_id,
+    s.customer_name,
+    s.customer_email,
+    s.customer_city,
+    s.customer_state,
+    s.membership_tier,
+    s.registration_date,
+
+    CURRENT_TIMESTAMP(),
+    TIMESTAMP('9999-12-31'),
+    TRUE,
+    CURRENT_TIMESTAMP()
+
+FROM (
+
+    SELECT DISTINCT
+        customer_id,
+        customer_name,
+        customer_email,
+        customer_city,
+        customer_state,
+        membership_tier,
+        registration_date
+
+    FROM retail_silver.silver_pos_transactions
+
+) s
+
+LEFT JOIN retail_gold.dim_customer d
+
+ON s.customer_id = d.customer_id
+AND d.is_current = TRUE
+
+WHERE d.customer_id IS NULL
+
+OR (
+
+       COALESCE(d.customer_name,'') != COALESCE(s.customer_name,'')
+    OR COALESCE(d.customer_email,'') != COALESCE(s.customer_email,'')
+    OR COALESCE(d.customer_city,'') != COALESCE(s.customer_city,'')
+    OR COALESCE(d.customer_state,'') != COALESCE(s.customer_state,'')
+    OR COALESCE(d.membership_tier,'') != COALESCE(s.membership_tier,'')
+
+);

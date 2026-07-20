@@ -1,0 +1,64 @@
+config {
+  type: "operations",
+  schema: "retail_gold",
+  dependencies: ["expire_store_records"]
+}
+
+INSERT INTO retail_gold.dim_store
+
+SELECT
+
+    ROW_NUMBER() OVER(
+        ORDER BY s.store_id
+    )
+    +
+    COALESCE(
+        (
+            SELECT MAX(store_sk)
+            FROM retail_gold.dim_store
+        ),
+        0
+    ),
+
+    s.store_id,
+    s.store_name,
+    s.store_city,
+    s.store_state,
+    s.region,
+    s.store_type,
+
+    CURRENT_TIMESTAMP(),
+    TIMESTAMP('9999-12-31'),
+    TRUE,
+    CURRENT_TIMESTAMP()
+
+FROM (
+
+    SELECT DISTINCT
+        store_id,
+        store_name,
+        store_city,
+        store_state,
+        region,
+        store_type
+
+    FROM retail_silver.silver_pos_transactions
+
+) s
+
+LEFT JOIN retail_gold.dim_store d
+
+ON s.store_id = d.store_id
+AND d.is_current = TRUE
+
+WHERE d.store_id IS NULL
+
+OR (
+
+       COALESCE(d.store_name,'') != COALESCE(s.store_name,'')
+    OR COALESCE(d.store_city,'') != COALESCE(s.store_city,'')
+    OR COALESCE(d.store_state,'') != COALESCE(s.store_state,'')
+    OR COALESCE(d.region,'') != COALESCE(s.region,'')
+    OR COALESCE(d.store_type,'') != COALESCE(s.store_type,'')
+
+);

@@ -1,0 +1,42 @@
+config {
+  type: "incremental",
+  schema: "retail_silver",
+  uniqueKey: ["transaction_id","product_id"]
+}
+
+SELECT
+    r.transaction_id,
+    r.transaction_date,
+    r.store_id,
+    r.store_name,
+    r.store_city,
+    r.store_state,
+    r.region,
+    r.store_type,
+    r.product_id,
+    r.product_name,
+    r.category,
+    r.sub_category,
+    r.brand,
+    r.unit_price,
+    r.cost_price,
+    r.customer_id,
+    r.customer_name,
+    r.customer_email,
+    r.customer_city,
+    r.customer_state,
+    r.membership_tier,
+    r.registration_date,
+    r.quantity_sold,
+    r.discount_applied,
+    r.final_amount
+FROM ${ref("raw_pos_transactions_incremental")} r
+
+${when(incremental(), `
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM ${self()} s
+    WHERE s.transaction_id = r.transaction_id
+      AND s.product_id = r.product_id
+)
+`)}
