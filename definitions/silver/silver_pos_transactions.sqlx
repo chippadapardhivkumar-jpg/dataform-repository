@@ -17,6 +17,7 @@ SELECT
     product_name,
     category,
     sub_category,
+    xyz,
     brand,
     unit_price,
     cost_price,
@@ -30,4 +31,4 @@ SELECT
     quantity_sold,
     discount_applied,
     final_amount
-FROM ${ref("raw_pos_transactions_incrementa")}
+FROM ${ref("raw_pos_transactions_incremental")}
