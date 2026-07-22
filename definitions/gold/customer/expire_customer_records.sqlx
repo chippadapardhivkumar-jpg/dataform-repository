@@ -1,33 +1,48 @@
 config {
   type: "operations",
-  schema: "retail_gold",
   dependencies: ["silver_pos_transactions"]
 }
 
-UPDATE retail_gold.dim_customer t
-
+UPDATE ${ref("dim_customer")} D
 SET
     effective_to = CURRENT_TIMESTAMP(),
     is_current = FALSE
-
-WHERE is_current = TRUE
-
+WHERE D.is_current = TRUE
 AND EXISTS (
 
-    SELECT 1
+    WITH latest_customer AS (
 
-    FROM retail_silver.silver_pos_transactions s
+        SELECT *
+        FROM (
 
-    WHERE t.customer_id = s.customer_id
+            SELECT
+                customer_id,
+                customer_name,
+                customer_email,
+                customer_city,
+                customer_state,
+                membership_tier,
+                registration_date,
 
-    AND (
+                ROW_NUMBER() OVER (
+                    PARTITION BY customer_id
+                    ORDER BY transaction_date DESC
+                ) rn
 
-           COALESCE(t.customer_name,'') != COALESCE(s.customer_name,'')
-        OR COALESCE(t.customer_email,'') != COALESCE(s.customer_email,'')
-        OR COALESCE(t.customer_city,'') != COALESCE(s.customer_city,'')
-        OR COALESCE(t.customer_state,'') != COALESCE(s.customer_state,'')
-        OR COALESCE(t.membership_tier,'') != COALESCE(s.membership_tier,'')
-
+            FROM ${ref("silver_pos_transactions")}
+        )
+        WHERE rn = 1
     )
 
+    SELECT 1
+    FROM latest_customer S
+    WHERE S.customer_id = D.customer_id
+    AND (
+        D.customer_name IS DISTINCT FROM S.customer_name
+        OR D.customer_email IS DISTINCT FROM S.customer_email
+        OR D.customer_city IS DISTINCT FROM S.customer_city
+        OR D.customer_state IS DISTINCT FROM S.customer_state
+        OR D.membership_tier IS DISTINCT FROM S.membership_tier
+        OR D.registration_date IS DISTINCT FROM S.registration_date
+    )
 );

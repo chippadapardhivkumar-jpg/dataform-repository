@@ -1,34 +1,44 @@
 config {
   type: "operations",
-  schema: "retail_gold",
   dependencies: ["silver_pos_transactions"]
 }
 
-UPDATE retail_gold.dim_product t
-
+UPDATE ${ref("dim_product")} D
 SET
     effective_to = CURRENT_TIMESTAMP(),
     is_current = FALSE
-
-WHERE is_current = TRUE
-
+WHERE D.is_current = TRUE
 AND EXISTS (
 
-    SELECT 1
+    WITH latest_product AS (
 
-    FROM retail_silver.silver_pos_transactions s
+        SELECT *
+        FROM (
 
-    WHERE t.product_id = s.product_id
+            SELECT
+                product_id,
+                product_name,
+                category,
+                sub_category,
+                brand,
 
-    AND (
+                ROW_NUMBER() OVER (
+                    PARTITION BY product_id
+                    ORDER BY transaction_date DESC
+                ) rn
 
-           COALESCE(t.product_name,'') != COALESCE(s.product_name,'')
-        OR COALESCE(t.category,'') != COALESCE(s.category,'')
-        OR COALESCE(t.sub_category,'') != COALESCE(s.sub_category,'')
-        OR COALESCE(t.brand,'') != COALESCE(s.brand,'')
-        OR COALESCE(t.unit_price,0) != COALESCE(s.unit_price,0)
-        OR COALESCE(t.cost_price,0) != COALESCE(s.cost_price,0)
-
+            FROM ${ref("silver_pos_transactions")}
+        )
+        WHERE rn = 1
     )
 
+    SELECT 1
+    FROM latest_product S
+    WHERE S.product_id = D.product_id
+    AND (
+        D.product_name IS DISTINCT FROM S.product_name
+        OR D.category IS DISTINCT FROM S.category
+        OR D.sub_category IS DISTINCT FROM S.sub_category
+        OR D.brand IS DISTINCT FROM S.brand
+    )
 );

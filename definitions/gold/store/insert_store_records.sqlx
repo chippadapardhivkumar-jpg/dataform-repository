@@ -1,64 +1,82 @@
 config {
   type: "operations",
-  schema: "retail_gold",
   dependencies: ["expire_store_records"]
 }
 
-INSERT INTO retail_gold.dim_store
+INSERT INTO ${ref("dim_store")}
+(
+    store_sk,
+    store_id,
+    store_name,
+    store_city,
+    store_state,
+    region,
+    store_type,
+    effective_from,
+    effective_to,
+    is_current
+)
+
+WITH latest_store AS (
+
+    SELECT *
+    FROM (
+
+        SELECT
+            store_id,
+            store_name,
+            store_city,
+            store_state,
+            region,
+            store_type,
+
+            ROW_NUMBER() OVER (
+                PARTITION BY store_id
+                ORDER BY transaction_date DESC
+            ) rn
+
+        FROM ${ref("silver_pos_transactions")}
+    )
+    WHERE rn = 1
+),
+
+records_to_insert AS (
+
+    SELECT S.*
+    FROM latest_store S
+
+    LEFT JOIN ${ref("dim_store")} D
+        ON S.store_id = D.store_id
+       AND D.is_current = TRUE
+
+    WHERE D.store_id IS NULL
+
+       OR D.store_name IS DISTINCT FROM S.store_name
+       OR D.store_city IS DISTINCT FROM S.store_city
+       OR D.store_state IS DISTINCT FROM S.store_state
+       OR D.region IS DISTINCT FROM S.region
+       OR D.store_type IS DISTINCT FROM S.store_type
+)
 
 SELECT
+    (
+        COALESCE(
+            (SELECT MAX(store_sk) FROM ${ref("dim_store")}),
+            0
+        )
+        +
+        ROW_NUMBER() OVER (ORDER BY store_id)
+    ) AS store_sk,
 
-    ROW_NUMBER() OVER(
-        ORDER BY s.store_id
-    )
-    +
-    COALESCE(
-        (
-            SELECT MAX(store_sk)
-            FROM retail_gold.dim_store
-        ),
-        0
-    ),
-
-    s.store_id,
-    s.store_name,
-    s.store_city,
-    s.store_state,
-    s.region,
-    s.store_type,
+    store_id,
+    store_name,
+    store_city,
+    store_state,
+    region,
+    store_type,
 
     CURRENT_TIMESTAMP(),
     TIMESTAMP('9999-12-31'),
-    TRUE,
-    CURRENT_TIMESTAMP()
+    TRUE
 
-FROM (
-
-    SELECT DISTINCT
-        store_id,
-        store_name,
-        store_city,
-        store_state,
-        region,
-        store_type
-
-    FROM retail_silver.silver_pos_transactions
-
-) s
-
-LEFT JOIN retail_gold.dim_store d
-
-ON s.store_id = d.store_id
-AND d.is_current = TRUE
-
-WHERE d.store_id IS NULL
-
-OR (
-
-       COALESCE(d.store_name,'') != COALESCE(s.store_name,'')
-    OR COALESCE(d.store_city,'') != COALESCE(s.store_city,'')
-    OR COALESCE(d.store_state,'') != COALESCE(s.store_state,'')
-    OR COALESCE(d.region,'') != COALESCE(s.region,'')
-    OR COALESCE(d.store_type,'') != COALESCE(s.store_type,'')
-
-);
+FROM records_to_insert;
