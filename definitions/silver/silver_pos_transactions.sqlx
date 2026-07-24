@@ -18,6 +18,7 @@ SELECT
     category,
     sub_category,
     brand,
+    xyz,
     unit_price,
     cost_price,
     customer_id,
