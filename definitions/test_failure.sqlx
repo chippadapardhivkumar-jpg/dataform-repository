@@ -3,4 +3,4 @@ config {
 }
 
 SELECT *
-FROM table_that_does_not_exist
+FROM table_not exist
