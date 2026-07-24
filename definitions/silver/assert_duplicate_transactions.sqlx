@@ -1,0 +1,14 @@
+config {
+  type: "assertion",
+  schema: "retail_silver"
+}
+
+SELECT
+    transaction_id,
+    product_id,
+    COUNT(*) AS duplicate_count
+FROM ${ref("silver_pos_transactions")}
+GROUP BY
+    transaction_id,
+    product_id
+HAVING COUNT(*) > 1
